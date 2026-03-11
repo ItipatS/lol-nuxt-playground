@@ -13,4 +13,6 @@ export default defineNuxtConfig({
   },
 
   css: ['~/assets/css/main.css'],
+
+  app: {  head: { title: 'LoL Profile Graph', link:[ {rel: 'icon', type: 'image/png', href: '/poro.png'} ] } },
 })

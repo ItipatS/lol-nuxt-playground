@@ -5,9 +5,15 @@ const account = ref<any | null>(null)
 const matches = ref<any[]>([])
 const matchDetails = ref<any[]>([])
 const selectedMatchId = ref<string | null>(null)
+const selectedChampion = ref<string | null>(null)
+const profileIconId = ref<number>(0)
 const errorMessage = ref('')
 const loading = ref(false)
 const loadingMatches = ref(false)
+const loadingMore = ref(false)
+const hasMore = ref(true)
+const matchOffset = ref(0)
+const BATCH = 10
 const sidebarOpen = ref(true)
 
 const DEFAULT_GAMENAME = 'Hide on bush'
@@ -23,6 +29,8 @@ async function searchPlayer() {
   matches.value = []
   matchDetails.value = []
   selectedMatchId.value = null
+  selectedChampion.value = null
+  profileIconId.value = 0
   loading.value = true
 
   try {
@@ -35,26 +43,15 @@ async function searchPlayer() {
     })
     account.value = accountData
 
-    // 2. Get match IDs
-    loadingMatches.value = true
-    const matchIds = await $fetch<string[]>('/api/matches', {
-      query: { puuid: accountData.puuid, count: 15 },
-    })
-    matches.value = matchIds
+    // 2. Get profile icon
+    const summonerData = await $fetch<any>('/api/summoner', { query: { puuid: accountData.puuid } })
+    profileIconId.value = summonerData.profileIconId
 
-    // 3. Fetch match details (parallel, batched)
-    const details: any[] = []
-    const batchSize = 5
-    for (let i = 0; i < matchIds.length; i += batchSize) {
-      const batch = matchIds.slice(i, i + batchSize)
-      const results = await Promise.all(
-        batch.map(id =>
-          $fetch(`/api/match/${id}`).catch(() => null),
-        ),
-      )
-      details.push(...results.filter(Boolean))
-      matchDetails.value = [...details]
-    }
+    // 3. Get first batch of match IDs
+    loadingMatches.value = true
+    matchOffset.value = 0
+    hasMore.value = true
+    await fetchMatchBatch(accountData.puuid)
   } catch (error: any) {
     errorMessage.value = error?.data?.message || error?.statusMessage || 'Search failed'
   } finally {
@@ -63,8 +60,39 @@ async function searchPlayer() {
   }
 }
 
+async function fetchMatchBatch(puuid: string) {
+  const matchIds = await $fetch<string[]>('/api/matches', {
+    query: { puuid, start: matchOffset.value, count: BATCH },
+  })
+
+  if (matchIds.length < BATCH) hasMore.value = false
+  matchOffset.value += matchIds.length
+  matches.value.push(...matchIds)
+
+  const results = await Promise.all(
+    matchIds.map(id => $fetch<any>(`/api/match/${id}`).catch(() => null)),
+  )
+  matchDetails.value.push(...results.filter(Boolean))
+}
+
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value || !account.value) return
+  loadingMore.value = true
+  try {
+    await fetchMatchBatch(account.value.puuid)
+  } finally {
+    loadingMore.value = false
+  }
+}
+
 function selectMatch(matchId: string) {
   selectedMatchId.value = selectedMatchId.value === matchId ? null : matchId
+  selectedChampion.value = null
+}
+
+function selectChampion(name: string) {
+  selectedChampion.value = selectedChampion.value === name ? null : name
+  selectedMatchId.value = null
 }
 </script>
 
@@ -118,7 +146,7 @@ function selectMatch(matchId: string) {
     </div>
 
     <!-- Main Content -->
-    <div class="flex min-h-0 flex-2">
+    <div class="flex min-h-0 flex-1">
       <!-- Left: Match History -->
       <aside
         v-if="account"
@@ -126,21 +154,26 @@ function selectMatch(matchId: string) {
         :class="sidebarOpen ? 'w-96' : 'w-0'"
       >
         <div
-          class="h-full overflow-hidden"
+          class="flex h-full flex-col"
           :class="sidebarOpen ? 'p-4 opacity-100' : 'p-0 opacity-0'"
           style="transition: opacity 0.2s, padding 0.3s"
         >
-          <div class="mb-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+          <div class="mb-4 shrink-0 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
             <p class="text-sm font-semibold text-zinc-100">
-              {{ account.gameName }}  <span class="text-zinc-500">  #{{ account.tagLine }}</span>
+              {{ account.gameName }}<span class="text-zinc-500"> #{{ account.tagLine }}</span>
             </p>
           </div>
 
           <MatchHistory
+            class="min-h-0 flex-1"
             :matches="matchDetails"
             :selected-match-id="selectedMatchId"
+            :selected-champion="selectedChampion"
             :player-puuid="account.puuid"
+            :loading-more="loadingMore"
+            :has-more="hasMore"
             @select="selectMatch"
+            @load-more="loadMore"
           />
         </div>
       </aside>
@@ -172,6 +205,10 @@ function selectMatch(matchId: string) {
           :player-puuid="account.puuid"
           :player-name="account.gameName"
           :selected-match-id="selectedMatchId"
+          :selected-champion="selectedChampion"
+          :player-icon-id="profileIconId"
+          :player-tag="account.tagLine"
+          @select-champion="selectChampion"
         />
 
         <!-- Empty state -->

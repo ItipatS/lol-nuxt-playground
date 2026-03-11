@@ -2,12 +2,29 @@
 const props = defineProps<{
   matches: any[]
   selectedMatchId: string | null
+  selectedChampion?: string | null
   playerPuuid: string
+  loadingMore?: boolean
+  hasMore?: boolean
 }>()
 
 const emit = defineEmits<{
   select: [matchId: string]
+  loadMore: []
 }>()
+
+const sentinel = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) emit('loadMore')
+    },
+    { threshold: 0.1 },
+  )
+  if (sentinel.value) observer.observe(sentinel.value)
+  onUnmounted(() => observer.disconnect())
+})
 
 // Maps summoner spell ID → DDragon key
 const SUMMONER_SPELLS: Record<number, string> = {
@@ -82,7 +99,9 @@ function isPlayerRow(participant: any) {
         :class="[
           selectedMatchId === match.metadata.matchId
             ? 'border-indigo-500/50 bg-indigo-500/10'
-            : 'border-zinc-800 bg-zinc-900/40',
+            : selectedChampion && getPlayerData(match)?.championName === selectedChampion
+              ? 'border-violet-500/40 bg-violet-500/10'
+              : 'border-zinc-800 bg-zinc-900/40',
         ]"
       >
         <!-- Match summary row (clickable) -->
@@ -212,6 +231,20 @@ function isPlayerRow(participant: any) {
 
       <div v-if="matches.length === 0" class="py-8 text-center text-sm text-zinc-600">
         No matches found
+      </div>
+
+      <!-- Infinite scroll sentinel -->
+      <div ref="sentinel" class="py-2 text-center">
+        <div v-if="loadingMore" class="flex items-center justify-center gap-2 text-xs text-zinc-600">
+          <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading more...
+        </div>
+        <p v-else-if="!hasMore && matches.length > 0" class="text-xs text-zinc-700">
+          All matches loaded
+        </p>
       </div>
     </div>
   </div>

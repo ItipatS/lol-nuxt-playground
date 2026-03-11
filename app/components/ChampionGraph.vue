@@ -22,7 +22,14 @@ const props = defineProps<{
   matches: any[]
   playerPuuid: string
   playerName: string
+  playerTag: string
+  playerIconId: number
   selectedMatchId: string | null
+  selectedChampion: string | null
+}>()
+
+const emit = defineEmits<{
+  selectChampion: [name: string]
 }>()
 
 const graphContainer = ref<HTMLElement | null>(null)
@@ -88,7 +95,7 @@ const graphData = computed(() => {
     })
   }
 
-  // If a match is selected, highlight the champion from that match
+  // Highlight champion from selected match
   if (props.selectedMatchId) {
     const match = props.matches.find((m: any) => m.metadata.matchId === props.selectedMatchId)
     if (match) {
@@ -98,6 +105,12 @@ const graphData = computed(() => {
         if (node) node.highlighted = true
       }
     }
+  }
+
+  // Highlight directly selected champion
+  if (props.selectedChampion) {
+    const node = nodes.find(n => n.id === props.selectedChampion)
+    if (node) node.highlighted = true
   }
 
   return { nodes, links }
@@ -204,18 +217,39 @@ function drawGraph() {
       .attr('filter', d.highlighted ? 'url(#glow)' : null)
 
     if (d.isPlayer) {
-      // Player node: gradient circle
-      g.append('circle')
-        .attr('r', r)
-        .attr('fill', '#312e81')
+      // Player node: profile icon image or fallback circle
+      if (props.playerIconId) {
+        g.append('image')
+          .attr('href', `https://ddragon.leagueoflegends.com/cdn/16.5.1/img/profileicon/${props.playerIconId}.png`)
+          .attr('x', -r)
+          .attr('y', -r)
+          .attr('width', r * 2)
+          .attr('height', r * 2)
+          .attr('clip-path', `url(#${clipId})`)
+          .attr('preserveAspectRatio', 'xMidYMid slice')
+      }
+      else {
+        g.append('circle').attr('r', r).attr('fill', '#312e81')
+      }
+
+      // Name label below node
+      const label = d.championName.length > 14 ? d.championName.slice(0, 13) + '…' : d.championName
+      g.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('y', r + 14)
+        .attr('fill', '#e4e4e7')
+        .attr('font-size', '11px')
+        .attr('font-weight', '600')
+        .style('pointer-events', 'none')
+        .text(label)
 
       g.append('text')
         .attr('text-anchor', 'middle')
-        .attr('dy', '0.35em')
-        .attr('fill', '#c7d2fe')
-        .attr('font-size', '11px')
-        .attr('font-weight', '600')
-        .text(d.championName.length > 10 ? d.championName.slice(0, 9) + '…' : d.championName)
+        .attr('y', r + 26)
+        .attr('fill', '#71717a')
+        .attr('font-size', '10px')
+        .style('pointer-events', 'none')
+        .text(`#${props.playerTag}`)
     } else {
       // Champion image
       g.append('image')
@@ -244,6 +278,10 @@ function drawGraph() {
     .style('color', '#e4e4e7')
     .style('backdrop-filter', 'blur(8px)')
     .style('z-index', '50')
+
+  node.on('click', (event, d) => {
+    if (!d.isPlayer) emit('selectChampion', d.championName)
+  })
 
   node.on('mouseenter', (event, d) => {
     if (d.isPlayer) return

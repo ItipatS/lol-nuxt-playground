@@ -219,7 +219,7 @@ function drawGraph() {
     } else {
       // Champion image
       g.append('image')
-        .attr('href', `https://ddragon.leagueoflegends.com/cdn/15.5.1/img/champion/${d.championName}.png`)
+        .attr('href', `https://ddragon.leagueoflegends.com/cdn/16.5.1/img/champion/${d.championName}.png`)
         .attr('x', -r)
         .attr('y', -r)
         .attr('width', r * 2)

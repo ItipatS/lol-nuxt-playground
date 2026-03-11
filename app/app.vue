@@ -8,6 +8,14 @@ const selectedMatchId = ref<string | null>(null)
 const errorMessage = ref('')
 const loading = ref(false)
 const loadingMatches = ref(false)
+const sidebarOpen = ref(true)
+
+const DEFAULT_GAMENAME = 'Hide on bush'
+const DEFAULT_TAGLINE = 'KR1'
+
+gameName.value = DEFAULT_GAMENAME
+tagLine.value = DEFAULT_TAGLINE
+onMounted(searchPlayer)
 
 async function searchPlayer() {
   errorMessage.value = ''
@@ -110,25 +118,51 @@ function selectMatch(matchId: string) {
     </div>
 
     <!-- Main Content -->
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-2">
       <!-- Left: Match History -->
       <aside
         v-if="account"
-        class="w-72 shrink-0 border-r border-zinc-800/60 p-4"
+        class="relative shrink-0 border-r border-zinc-800/60 transition-all duration-300"
+        :class="sidebarOpen ? 'w-96' : 'w-0'"
       >
-        <div class="mb-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-          <p class="text-sm font-semibold text-zinc-100">
-            {{ account.gameName }}<span class="text-zinc-500">#{{ account.tagLine }}</span>
-          </p>
-        </div>
+        <div
+          class="h-full overflow-hidden"
+          :class="sidebarOpen ? 'p-4 opacity-100' : 'p-0 opacity-0'"
+          style="transition: opacity 0.2s, padding 0.3s"
+        >
+          <div class="mb-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+            <p class="text-sm font-semibold text-zinc-100">
+              {{ account.gameName }}  <span class="text-zinc-500">  #{{ account.tagLine }}</span>
+            </p>
+          </div>
 
-        <MatchHistory
-          :matches="matchDetails"
-          :selected-match-id="selectedMatchId"
-          :player-puuid="account.puuid"
-          @select="selectMatch"
-        />
+          <MatchHistory
+            :matches="matchDetails"
+            :selected-match-id="selectedMatchId"
+            :player-puuid="account.puuid"
+            @select="selectMatch"
+          />
+        </div>
       </aside>
+
+      <!-- Sidebar toggle button -->
+      <div
+        v-if="account"
+        class="relative z-10 flex shrink-0 items-center"
+      >
+        <button
+          class="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-zinc-400 shadow transition hover:border-zinc-500 hover:text-zinc-200"
+          @click="sidebarOpen = !sidebarOpen"
+        >
+          <svg
+            class="h-3 w-3 transition-transform duration-300"
+            :class="sidebarOpen ? '' : 'rotate-180'"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          >
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+      </div>
 
       <!-- Right: Champion Graph -->
       <main class="relative min-h-0 flex-1">
